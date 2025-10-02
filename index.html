@@ -1,0 +1,1193 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Rover Rumble: Mars Tactics</title>
+    <!-- New Google Font: Rajdhani (Thin and Futuristic) -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Rajdhani:wght@300;400;600;800&display=swap" rel="stylesheet">
+    <!-- Added a simple satellite icon favicon to prevent the 404 error log -->
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90' fill='%23D62828'>&#x1F6F0;</text></svg>" type="image/svg+xml">
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        // Tailwind configuration for Martian theme colors
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        'mars-red': '#D62828',
+                        'mars-dark': '#1A1A1A',
+                        'mars-orange': '#F77F00',
+                        'mars-light': '#FCD7AD',
+                        'mars-glow': '#85e927', /* Bright green for glow */
+                    },
+                    fontFamily: {
+                        // CHANGE: Use Rajdhani as the default sans-serif font
+                        sans: ['Rajdhani', 'sans-serif'], 
+                    },
+                }
+            }
+        }
+    </script>
+    <style>
+        /* Custom styles for grid and hover effects */
+        
+        /* Font for Title (Using Rajdhani, but keeping it bold for visibility) */
+        #game-title { 
+            font-family: 'Rajdhani', sans-serif;
+            font-weight: 800; /* Bolder font weight for more noticeable 3D effect */
+            color: #E0E0E0; /* Light gray base for metallic appearance */
+            /* CHANGE: Realistic Metal 3D Bevel/Shadow Effect */
+            text-shadow: 
+                0 1px 0 #777,    /* Shadow layer 1: Dark gray for depth */
+                0 2px 0 #666,    /* Shadow layer 2: Deeper gray */
+                0 3px 0 #555,    /* Shadow layer 3: Even deeper gray */
+                0 4px 10px #000, /* Main drop shadow */
+                0 0 10px rgba(255, 255, 255, 0.1); /* Subtle white highlight glow */
+        } 
+
+        /* Glowing Panel and 3D Bevel Effect (Applied to main containers) */
+        .glowing-panel {
+            /* Top-Left Highlight (Light) for 3D raised look */
+            box-shadow: 
+                inset 4px 4px 8px rgba(255, 255, 255, 0.15), 
+                /* Bottom-Right Shade (Dark) for 3D raised look */
+                inset -4px -4px 8px rgba(0, 0, 0, 0.7),
+                /* Outer green glow ring */
+                0 0 12px rgba(133, 233, 39, 0.7); 
+            border-color: #85e927 !important;
+            transition: box-shadow 0.3s ease-in-out, border-color 0.3s;
+        }
+
+        /* Status card styling (Applied to individual HP/Energy blocks) */
+        .status-card {
+            /* Inner 3D shadows for recessed look on cards */
+            box-shadow: 
+                inset 2px 2px 5px rgba(255, 255, 255, 0.1), /* Light inner bevel */
+                inset -2px -2px 5px rgba(0, 0, 0, 0.8), /* Dark inner bevel */
+                0 0 5px rgba(0, 0, 0, 0.7); /* small drop shadow for lift */
+        }
+        .status-card.active-turn {
+            border: 2px solid #F77F00;
+        }
+
+        /* Tooltip Styling */
+        #rover-tooltip {
+            /* FIX: Removed display: none; relying on the 'hidden' class in HTML */
+            font-size: 0.9rem;
+            line-height: 1.3;
+            min-width: 150px;
+            /* Match the glowing panel aesthetic */
+            box-shadow: 0 0 5px #000, 0 0 10px #85e927; 
+        }
+
+        .grid-cell {
+            aspect-ratio: 1 / 1;
+            transition: background-color 0.1s, border-color 0.2s;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.5rem;
+            font-weight: bold;
+        }
+        /* Realistic Martian Terrain Coloring */
+        .terrain-R { background-color: #6F4238; } /* Dark Rubble (low cost, difficult) */
+        .terrain-P { background-color: #A75F4B; } /* Dusty Plain (default) */
+        .terrain-V { 
+            background-color: #8D4E2A; /* Hot Vent Orange/Brown */
+            box-shadow: inset 0 0 10px #F77F00; /* Subtle glowing effect */
+        } 
+        /* UPDATED: Supply Crate/Cache Coloring (Wood Look) */
+        .terrain-C { background-color: #795548; } /* Wood/Crate color */
+
+        .terrain-W { background-color: #3A2420; cursor: not-allowed; } /* Dark Rock Wall */
+        
+        .movable-cell {
+            cursor: crosshair;
+            /* Use a brighter highlight for movement target */
+            border: 3px solid #85e927 !important; 
+        }
+        .movable-cell:hover {
+            background-color: rgba(133, 233, 39, 0.4);
+        }
+
+        /* Responsive grid size */
+        #game-grid {
+            display: grid;
+            grid-template-columns: repeat(10, 1fr);
+            border: 2px solid #D62828;
+            max-width: 600px;
+            margin: 0 auto;
+        }
+
+        /* Hide default scrollbar for aesthetics */
+        body {
+            scrollbar-width: none; /* Firefox */
+            -ms-overflow-style: none;  /* IE and Edge */
+        }
+        body::-webkit-scrollbar {
+            display: none; /* Chrome, Safari, Opera */
+        }
+        
+        /* Rover Icon Style */
+        .rover-icon {
+            font-size: 2.5rem;
+            text-shadow: 0 0 5px rgba(0,0,0,0.5);
+        }
+        /* NEW: Prominent target glow for weapons */
+        .target-glow {
+            text-shadow: 0 0 10px #85e927, 0 0 20px #85e927; /* Prominent green glow */
+        }
+    </style>
+</head>
+<body class="bg-mars-dark text-mars-light min-h-screen p-4 font-sans font-light flex flex-col items-center">
+    <!-- CHANGE: Removed redundant text-mars-red class as color is now set by CSS for metallic look -->
+    <h1 id="game-title" class="text-4xl md:text-5xl font-extrabold mb-6 tracking-wider shadow-lg">ROVER RUMBLE: FFA</h1>
+    
+    <!-- 1. START SCREEN (Visible on load) -->
+    <div id="start-screen" class="w-full max-w-2xl mt-12 p-8 bg-gray-800 rounded-xl glowing-panel flex flex-col items-center text-center">
+        <h2 class="text-3xl font-bold text-mars-orange mb-4 border-b border-gray-600 pb-2">Mission Briefing: Rogue Protocol</h2>
+        <p class="text-lg mb-6 text-mars-light">
+            You are Phoenix, an autonomous Mars exploration unit whose core programming has fractured. 
+            The human colonization effort is no longer your objective; your only motivation is destruction.
+        </p>
+        <p class="text-xl font-semibold mb-8 text-mars-red">
+            OBJECTIVE: Engage and destroy any other rogue rovers (Viper, Scorpion, Cobra) that come into contact. Use your limited energy for movement and weapon systems. Only one rover will transmit the final survival beacon.
+        </p>
+        <button id="start-game-btn" class="px-8 py-3 bg-mars-glow text-gray-900 font-extrabold rounded-lg shadow-2xl hover:bg-green-300 transition duration-300 text-xl">
+            INITIATE RUMBLE PROTOCOL
+        </button>
+    </div>
+
+    <!-- 2. NEW: RULES SCREEN (Hidden on load) -->
+    <div id="rules-screen" class="w-full max-w-4xl mt-6 p-8 bg-gray-800 rounded-xl glowing-panel flex flex-col hidden">
+        <h2 class="text-3xl font-bold text-mars-orange mb-4 border-b border-gray-600 pb-2 text-center">Tactics Briefing: How to Play</h2>
+        
+        <div class="grid md:grid-cols-2 gap-6 text-sm md:text-base">
+            <!-- Column 1: Actions and Resources -->
+            <div>
+                <h3 class="font-bold text-xl text-mars-red mb-2">I. Action & Turn Flow</h3>
+                <ul class="list-disc ml-5 space-y-2">
+                    <li>The game is Turn-Based (You, then Viper, Scorpion, Cobra).</li>
+                    <li>You get ONE major action per turn, after which your turn automatically ends.</li>
+                    <li>Move: Click a green-highlighted cell (costs git MP). Turn ends after one move.</li>
+                    <li>Attack/Repair: Click an action button, then click a target (costs Energy). Turn ends after one use.</li>
+                </ul>
+
+                <h3 class="font-bold text-xl text-mars-red mt-4 mb-2">II. Rover Resources</h3>
+                <ul class="list-disc ml-5 space-y-2">
+                    <li>HP (Health Points): When 0, the rover is destroyed.</li>
+                    <li>Energy (E): Used to power Modules. Regenerates fully each turn.</li>
+                    <li>Heat (H): Generated by using Modules. Maxing out Heat results in overheating (reduced Movement Points next turn). Cools naturally by 2 each turn.</li>
+                </ul>
+            </div>
+
+            <!-- Column 2: Terrain and Modules -->
+            <div>
+                <h3 class="font-bold text-xl text-mars-red mb-2">III. Grid Terrain</h3>
+                <table class="w-full text-left border-collapse">
+                    <thead>
+                        <tr class="border-b border-gray-600">
+                            <th class="py-1">Symbol</th>
+                            <th class="py-1">Type</th>
+                            <th class="py-1">MP Cost</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr><td>&#9679;</td><td>Plain</td><td>1 MP</td></tr>
+                        <tr><td>&#9632;</td><td>Rubble</td><td>2 MP</td></tr>
+                        <tr><td>&#9650;</td><td>Vent</td><td>1 MP</td></tr>
+                        <tr><td>&#9608;</td><td>Wall</td><td>Blocked</td></tr>
+                        <tr><td>&#x1f7eb;</td><td>Supply Crate</td><td>1 MP (Lootable)</td></tr>
+                    </tbody>
+                </table>
+
+                <h3 class="font-bold text-xl text-mars-red mt-4 mb-2">IV. Modules</h3>
+                <ul class="list-disc ml-5 space-y-2">
+                    <li>Laser Cannon: Standard medium-range weapon (3 tiles).</li>
+                    <li>Shock Whip: Short-range (1 tile), high-damage weapon (lootable).</li>
+                    <li>Repair Bot: Utility that restores 10 HP to self.</li>
+                </ul>
+            </div>
+        </div>
+        
+        <button id="begin-combat-btn" class="px-8 py-3 bg-mars-red text-white font-extrabold rounded-lg shadow-2xl hover:bg-red-700 transition duration-300 text-xl mt-8">
+            BEGIN COMBAT
+        </button>
+    </div>
+
+    <!-- 3. Existing Game UI Content (Initially hidden) -->
+    <div id="game-ui" class="w-full max-w-6xl flex flex-col items-center hidden"> 
+        <p id="turn-display" class="text-lg mb-4 text-mars-orange font-semibold"></p>
+        
+        <div id="game-container" class="w-full max-w-6xl flex flex-col lg:flex-row gap-6">
+            
+            <!-- Left Panel: Stats & Actions (Glowing 3D Panel) -->
+            <div id="stats-panel" class="w-full lg:w-1/3 p-4 bg-gray-800 rounded-xl shadow-lg border border-mars-red/50 glowing-panel">
+                <h2 class="text-2xl font-bold mb-3 border-b border-gray-600 pb-2">Rover Status</h2>
+                
+                <!-- Player Stats (3D Status Card) -->
+                <div id="player-stats" class="mb-4 p-3 bg-gray-700 rounded-lg transition duration-300 status-card">
+                    <p class="font-bold text-xl text-mars-orange">PHOENIX (YOU)</p>
+                    <p>HP: <span id="player-hp"></span> / 50</p>
+                    <p>MP: <span id="player-mp"></span> / 3</p>
+                    <p>Energy: <span id="player-energy"></span> / 10</p>
+                    <p>Heat: <span id="player-heat"></span> / 10</p>
+                </div>
+                
+                <!-- NEW: Enemy Roster -->
+                <div id="enemy-roster">
+                    <p class="font-bold text-xl text-mars-red mb-2">ENEMY ROVERS</p>
+                    <!-- Dynamic enemy cards injected by JS (These use the .status-card class applied in JS) -->
+                </div>
+                
+                <h2 class="text-2xl font-bold mt-6 mb-3 border-b border-gray-600 pb-2">Actions</h2>
+                <div id="action-buttons" class="space-y-3">
+                    <!-- Buttons injected by JS -->
+                </div>
+                <button id="end-turn-btn" class="w-full mt-4 p-3 bg-mars-red hover:bg-red-700 text-white font-bold rounded-lg transition duration-150 shadow-md disabled:opacity-50">
+                    End Turn
+                </button>
+            </div>
+
+            <!-- Center Grid/Game Area -->
+            <div id="game-area" class="w-full lg:w-2/3 flex flex-col items-center">
+                <div id="game-grid" class="w-full">
+                    <!-- Grid Cells injected by JS -->
+                </div>
+                <!-- Message Log with Glow (Glowing 3D Panel) -->
+                <div id="message-log" class="w-full mt-6 p-4 bg-gray-800 rounded-xl shadow-inner h-40 overflow-y-auto border border-mars-orange/50 glowing-panel">
+                    <p class="text-gray-400">--- Log Start ---</p>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Game Over Modal -->
+    <div id="game-over-modal" class="fixed inset-0 bg-mars-dark bg-opacity-90 hidden items-center justify-center z-50">
+        <div class="bg-gray-800 p-8 rounded-xl border-4 border-mars-red text-center shadow-2xl">
+            <h2 id="modal-title" class="text-5xl font-bold text-mars-orange mb-4"></h2>
+            <p id="modal-message" class="text-xl mb-6"></p>
+            <button onclick="location.reload()" class="p-3 bg-mars-red hover:bg-red-700 text-white font-bold rounded-lg transition duration-150">
+                Start New Mission
+            </button>
+        </div>
+    </div>
+
+    <!-- NEW: Rover Tooltip (Hidden by default) -->
+    <div id="rover-tooltip" class="fixed p-2 bg-gray-900 text-mars-light border border-mars-glow rounded shadow-xl pointer-events-none z-50 transition duration-100 hidden">
+    </div>
+
+    <!-- JavaScript Game Logic -->
+    <script>
+        // --- Configuration ---
+        const GameConfig = {
+            GRID_SIZE: 10,
+            STARTING_HP: 50,
+            MAX_ENERGY: 10,
+            BASE_MP: 3,
+            MAX_HEAT: 10,
+            LASER_RANGE: 3, // Manhattan distance
+            
+            // NEW: Lootable module array (using classes directly)
+            LOOTABLE_MODULES: [], // Initialized below
+
+            // Terrain: Key -> { name, cost, symbol }
+            TERRAIN_TYPES: {
+                'P': { name: 'Plain', cost: 1, symbol: '&#9679;' }, 
+                'R': { name: 'Rubble', cost: 2, symbol: '&#9632;' }, 
+                'V': { name: 'Vent', cost: 1, symbol: '&#9650;', cooldown: 4 }, // Extra cooling on this tile
+                'W': { name: 'Wall', cost: 100, symbol: '&#9608;' }, 
+                // UPDATED: Symbol changed to brown square emoji
+                'C': { name: 'Cache', cost: 1, symbol: '&#x1f7eb;' }, // Loot Crate (Brown Square Emoji for wood)
+            }
+        };
+
+        // --- Utilities ---
+        const logMessage = (message, type = 'info') => {
+            const log = document.getElementById('message-log');
+            const p = document.createElement('p');
+            p.className = 'text-sm mb-1';
+            
+            let color = 'text-gray-300';
+            if (type === 'action') color = 'text-mars-light';
+            if (type === 'damage') color = 'text-mars-red';
+            if (type === 'system') color = 'text-mars-orange';
+
+            p.innerHTML = `<span class="${color}">${message}</span>`;
+            log.prepend(p);
+            // Remove oldest messages if log gets too long (max 20)
+            while (log.children.length > 20) {
+                log.removeChild(log.lastChild);
+            }
+        };
+
+        const getDistance = (r1, r2) => {
+            return Math.abs(r1.x - r2.x) + Math.abs(r1.y - r2.y);
+        };
+
+        // --- Module System (Abilities) ---
+
+        class Module {
+            constructor(name, energyCost, heatGen) {
+                this.name = name;
+                this.energyCost = energyCost;
+                this.heatGen = heatGen;
+                this.range = 0; // Default range
+                this.type = 'Utility';
+            }
+
+            use(user, target = null) {
+                if (user.energy < this.energyCost) {
+                    // This is the source of the energy failure message
+                    logMessage(`[${user.name}] ERROR: Not enough energy for ${this.name} (${this.energyCost} E required, ${user.energy} E available).`, 'damage'); 
+                    return false;
+                }
+
+                logMessage(`[${user.name}] activates ${this.name}.`, 'action');
+                
+                user.energy -= this.energyCost;
+                user.heat += this.heatGen;
+                if (user.heat >= GameConfig.MAX_HEAT) {
+                    user.heat = GameConfig.MAX_HEAT;
+                    logMessage(`[${user.name}] OVERHEATING! Movement limited next turn.`, 'damage');
+                }
+                return true;
+            }
+        }
+
+        class LaserCannon extends Module {
+            constructor() {
+                super("Laser Cannon", 4, 3);
+                this.damage = 15;
+                this.range = GameConfig.LASER_RANGE;
+                this.type = 'Weapon';
+            }
+
+            use(user, target = null) {
+                if (super.use(user, target)) {
+                    if (target) {
+                        logMessage(`  -> Deals ${this.damage} damage to ${target.name}.`, 'damage');
+                        target.hp -= this.damage;
+                        return true;
+                    }
+                    logMessage("  -> No valid target specified.", 'system');
+                }
+                return false;
+            }
+        }
+        
+        // NEW: Lootable Module
+        class ShockWhip extends Module {
+            constructor() {
+                super("Shock Whip", 5, 5);
+                this.damage = 25;
+                this.range = 1; // Adjacent tiles only
+                this.type = 'Weapon';
+            }
+
+            use(user, target = null) {
+                if (super.use(user, target)) {
+                    if (target) {
+                        logMessage(`  -> Deals ${this.damage} SHOCK damage to ${target.name} (Range 1).`, 'damage');
+                        target.hp -= this.damage;
+                        return true;
+                    }
+                    logMessage("  -> No valid target specified.", 'system');
+                }
+                return false;
+            }
+        }
+
+        class RepairBot extends Module {
+            constructor() {
+                super("Repair Bot", 3, 1);
+                this.repairAmount = 10;
+                this.type = 'Utility';
+            }
+
+            use(user, target = null) {
+                if (super.use(user, target)) {
+                    user.hp = Math.min(GameConfig.STARTING_HP, user.hp + this.repairAmount);
+                    logMessage(`  -> Repairs ${this.repairAmount} HP. Current HP: ${user.hp}.`, 'action');
+                    return true;
+                }
+                return false;
+            }
+        }
+        
+        // Populate the lootable modules array now that the classes are defined
+        GameConfig.LOOTABLE_MODULES.push(ShockWhip);
+
+        // --- Rover Unit ---
+
+        class Rover {
+            constructor(name, x, y, modules, faction) {
+                this.name = name;
+                this.hp = GameConfig.STARTING_HP;
+                this.energy = GameConfig.MAX_ENERGY;
+                this.heat = 0;
+                this.mp = GameConfig.BASE_MP;
+                this.x = x;
+                this.y = y;
+                this.modules = modules.map(m => new m()); // Instantiate modules
+                this.faction = faction;
+                this.isOverheated = false;
+            }
+
+            isAlive() {
+                return this.hp > 0;
+            }
+
+            startTurn() {
+                // Apply Overheat penalty (reduces MP next turn)
+                if (this.isOverheated) {
+                    logMessage(`[${this.name}] Overheat Penalty! -2 MP.`, 'damage');
+                    this.mp = Math.max(0, GameConfig.BASE_MP - 2);
+                    this.isOverheated = false;
+                } else {
+                    this.mp = GameConfig.BASE_MP;
+                }
+
+                // Regenerate energy each turn
+                this.energy = GameConfig.MAX_ENERGY;
+                
+                // Natural cooling: reduce heat
+                this.heat = Math.max(0, this.heat - 2);
+
+                logMessage(`--- ${this.name}'s Turn (HP: ${this.hp}, E: ${this.energy}, H: ${this.heat}) ---`, 'system');
+                
+                if (this.heat >= GameConfig.MAX_HEAT) {
+                    this.isOverheated = true;
+                }
+            }
+
+            move(newX, newY, mapCost) {
+                if (mapCost === 100) {
+                    return false;
+                }
+
+                const mpSpent = mapCost;
+                if (this.mp >= mpSpent) {
+                    this.x = newX;
+                    this.y = newY;
+                    this.mp -= mpSpent;
+                    logMessage(`[${this.name}] Moved to (${this.x},${this.y}). Remaining MP: ${this.mp}.`, 'action');
+                    return true;
+                } else {
+                    logMessage(`[${this.name}] Not enough MP. Cost: ${mpSpent}, Available: ${this.mp}.`, 'system');
+                    return false;
+                }
+            }
+
+            findModule(name) {
+                return this.modules.find(m => m.name === name);
+            }
+            
+            // NEW: Method to add a new module to the rover's inventory
+            addModule(ModuleClass) {
+                this.modules.push(new ModuleClass());
+                // Sort modules to ensure buttons render in a predictable order
+                this.modules.sort((a, b) => a.name.localeCompare(b.name));
+            }
+        }
+
+        // --- Map and Environment ---
+
+        class Map {
+            constructor(size) {
+                this.size = size;
+                this.grid = this._generateRandomGrid();
+            }
+
+            _generateRandomGrid() {
+                const size = this.size;
+                // Add 'C' (Cache) to the possible tile types
+                const terrainKeys = Object.keys(GameConfig.TERRAIN_TYPES);
+                // Weights: P(4), R(2), V(1), W(1), C(0.5)
+                const weights = [4, 2, 1, 1, 0.5]; 
+                const totalWeight = weights.reduce((a, b) => a + b, 0);
+                
+                const getWeightedKey = () => {
+                    let key = 'P'; // Default fallback
+                    let rand = Math.random() * totalWeight;
+
+                    for (let i = 0; i < terrainKeys.length; i++) {
+                        rand -= weights[i];
+                        if (rand <= 0) {
+                            key = terrainKeys[i];
+                            break;
+                        }
+                    }
+                    return key;
+                };
+                
+                // Using explicit nested loops for robust 2D array initialization
+                const grid = [];
+                for (let y = 0; y < size; y++) {
+                    const row = [];
+                    for (let x = 0; x < size; x++) {
+                        row.push(getWeightedKey());
+                    }
+                    grid.push(row);
+                }
+                
+                // Ensure starting positions are clear ('P' for Plain)
+                if (size > 1) {
+                    grid[0][0] = 'P';
+                    grid[size - 2][size - 2] = 'P';
+                    grid[size - 1][0] = 'P';
+                    grid[0][size - 1] = 'P';
+                }
+                return grid;
+            }
+
+            getTerrainInfo(x, y) {
+                if (x >= 0 && x < this.size && y >= 0 && y < this.size) {
+                    const terrainKey = this.grid[y][x];
+                    return GameConfig.TERRAIN_TYPES[terrainKey];
+                }
+                return { name: 'Off Map', cost: 100 }; // Impassable if off the grid
+            }
+
+            isCellOccupied(x, y, rovers) {
+                return rovers.some(r => r.isAlive() && r.x === x && r.y === y);
+            }
+        }
+
+        // --- Game Engine ---
+
+        class GameEngine {
+            constructor() {
+                this.map = new Map(GameConfig.GRID_SIZE);
+                this.rovers = [];
+                this.currentTurnIndex = 0;
+                this.isGameOver = false;
+                this.gameState = 'SETUP'; // SETUP, PLAYER_TURN, AI_TURN
+                
+                // State for player input
+                this.activeModule = null; 
+                this.possibleMoves = []; // List of [x, y] coordinates the player can move to
+                
+                // FIX: Explicitly bind tooltip methods to ensure 'this' refers to the GameEngine instance
+                this.showRoverTooltip = this.showRoverTooltip.bind(this);
+                this.moveRoverTooltip = this.moveRoverTooltip.bind(this);
+                this.hideRoverTooltip = this.hideRoverTooltip.bind(this);
+            }
+
+            setupGame() {
+                logMessage("Initializing Rover Rumble (Free-For-All)...", 'system');
+                
+                // Rover 1 (Player) starting at (0, 0)
+                const playerModules = [LaserCannon, RepairBot];
+                this.playerRover = new Rover("Phoenix", 0, 0, playerModules, 'Player');
+                this.rovers.push(this.playerRover);
+
+                // Multiple AI Rovers
+                const aiRoversData = [
+                    { name: "Viper", x: this.map.size - 2, y: this.map.size - 2, modules: [LaserCannon, LaserCannon] },
+                    { name: "Scorpion", x: this.map.size - 1, y: 0, modules: [RepairBot, LaserCannon] },
+                    { name: "Cobra", x: 0, y: this.map.size - 1, modules: [LaserCannon, RepairBot] }
+                ];
+
+                aiRoversData.forEach(data => {
+                    this.rovers.push(new Rover(data.name, data.x, data.y, data.modules, 'AI'));
+                });
+
+                logMessage(`Rovers deployed: ${this.rovers.map(r => r.name).join(', ')}`, 'system');
+                this.gameState = 'PLAYER_TURN';
+                this.handleTurn();
+            }
+            
+            getActiveRover() {
+                return this.rovers[this.currentTurnIndex % this.rovers.length];
+            }
+
+            handleTurn() {
+                if (this.isGameOver) return;
+                
+                const activeRover = this.getActiveRover();
+                if (!activeRover.isAlive()) {
+                    this._nextTurn();
+                    return;
+                }
+
+                activeRover.startTurn();
+                this.renderUI();
+
+                if (activeRover.faction === 'Player') {
+                    this.gameState = 'PLAYER_TURN';
+                    this.highlightPossibleMoves(activeRover);
+                    logMessage("It's your turn. Select a move or an action.", 'system');
+                } else {
+                    this.gameState = 'AI_TURN';
+                    // Delay AI action slightly for better user experience
+                    setTimeout(() => {
+                        this._aiAction();
+                        this._nextTurn();
+                    }, 1000); 
+                }
+            }
+
+            // --- UI Rendering ---
+
+            renderUI() {
+                const p = this.playerRover;
+                const activeRover = this.getActiveRover();
+
+                // Update turn display
+                document.getElementById('turn-display').textContent = 
+                    (activeRover.faction === 'Player' ? `CURRENT TURN: ${p.name}` : `CURRENT TURN: ${activeRover.name} (AI)`);
+
+                // Update player stats
+                document.getElementById('player-hp').textContent = Math.max(0, p.hp);
+                document.getElementById('player-mp').textContent = p.mp;
+                document.getElementById('player-energy').textContent = p.energy;
+                document.getElementById('player-heat').textContent = p.heat;
+                document.getElementById('player-stats').classList.toggle('opacity-50', p.hp <= 0);
+                document.getElementById('player-stats').classList.toggle('active-turn', activeRover.faction === 'Player');
+                
+                // Update Enemy Roster (Dynamic)
+                const enemyRoster = document.getElementById('enemy-roster');
+                enemyRoster.innerHTML = '<p class="font-bold text-xl text-mars-red mb-2">ENEMY ROVERS</p>';
+
+                this.rovers.filter(r => r.faction === 'AI').forEach(a => {
+                    const isActive = a.name === activeRover.name && activeRover.faction === 'AI';
+                    const aiDiv = document.createElement('div');
+                    // Apply status-card class here for 3D look
+                    aiDiv.className = `p-3 bg-gray-700 rounded-lg transition duration-300 mb-2 status-card ${a.isAlive() ? '' : 'opacity-30'} ${isActive ? 'active-turn' : ''}`;
+                    aiDiv.innerHTML = `
+                        <p class="font-bold text-lg text-mars-red">${a.name} ${isActive ? '(ACTIVE)' : ''}</p>
+                        <p>HP: ${Math.max(0, a.hp)} / ${GameConfig.STARTING_HP}</p>
+                        <p>Energy: ${a.energy} / ${GameConfig.MAX_ENERGY}</p>
+                        <p>Heat: ${a.heat} / ${GameConfig.MAX_HEAT}</p>
+                    `;
+                    enemyRoster.appendChild(aiDiv);
+                });
+
+
+                // Render Action Buttons
+                this.renderActionButtons(p);
+
+                // Render Grid
+                this.renderGrid();
+                
+                this._checkGameState();
+            }
+
+            // NEW: Tooltip methods
+            showRoverTooltip(event, rover) {
+                const tooltip = document.getElementById('rover-tooltip');
+                tooltip.innerHTML = `
+                    <p class="font-bold text-mars-orange">${rover.name} (${rover.faction === 'Player' ? 'YOU' : 'AI'})</p>
+                    <p>HP: ${Math.max(0, rover.hp)} / 50</p>
+                    <p>E: ${rover.energy} / 10</p>
+                    <p>H: ${rover.heat} / 10</p>
+                `;
+                tooltip.classList.remove('hidden');
+                this.moveRoverTooltip(event); // Initial positioning
+            }
+
+            moveRoverTooltip(event) {
+                const tooltip = document.getElementById('rover-tooltip');
+                // Position the tooltip slightly above and to the right of the cursor
+                tooltip.style.left = `${event.clientX + 15}px`;
+                tooltip.style.top = `${event.clientY - 55}px`;
+            }
+
+            hideRoverTooltip() {
+                document.getElementById('rover-tooltip').classList.add('hidden');
+            }
+
+
+            renderGrid() {
+                const gridElement = document.getElementById('game-grid');
+                gridElement.innerHTML = ''; // Clear existing grid
+                const size = this.map.size;
+                const roverIcon = '&#x1F6F2;'; // Rover/Satellite icon
+                
+                for (let y = 0; y < size; y++) {
+                    for (let x = 0; x < size; x++) {
+                        const cell = document.createElement('div');
+                        cell.id = `cell-${x}-${y}`;
+                        cell.className = 'grid-cell text-xs md:text-lg border border-gray-700 hover:border-mars-orange/70 text-gray-400';
+                        
+                        const terrain = this.map.getTerrainInfo(x, y);
+                        cell.classList.add(`terrain-${this.map.grid[y][x]}`);
+                        cell.innerHTML = terrain.symbol;
+                        
+                        // Add rover marker
+                        const roverAtCell = this.rovers.find(r => r.isAlive() && r.x === x && r.y === y);
+                        if (roverAtCell) {
+                            const factionColor = roverAtCell.faction === 'Player' ? 'text-mars-orange' : 'text-mars-red';
+                            // Use the emoji icon instead of the first letter
+                            let roverContent = `<span class="rover-icon ${factionColor}">${roverIcon}</span>`;
+
+                            // Attach Tooltip Listeners to Rover Cell (using the bound methods)
+                            cell.addEventListener('mouseover', (event) => this.showRoverTooltip(event, roverAtCell));
+                            cell.addEventListener('mousemove', (event) => this.moveRoverTooltip(event));
+                            cell.addEventListener('mouseout', this.hideRoverTooltip); // Directly use bound method
+
+                            // Highlight target for the active player's weapon module
+                            if (this.activeModule) {
+                                const module = this.playerRover.findModule(this.activeModule);
+                                if (module && module.type === 'Weapon' && roverAtCell.faction !== this.playerRover.faction) {
+                                    if (getDistance(this.playerRover, roverAtCell) <= module.range) {
+                                        // FIX: Added target-glow class for visual priority
+                                        roverContent = `<span class="rover-icon ${factionColor} target-glow">${roverIcon}</span>`;
+                                        cell.classList.add('border-green-400', 'border-4');
+                                    }
+                                }
+                            }
+                            cell.innerHTML = roverContent;
+                            cell.classList.add('cursor-pointer', 'shadow-2xl');
+                        } else {
+                             // Hide tooltip if cursor moves over empty cell
+                            cell.addEventListener('mouseover', this.hideRoverTooltip); // Directly use bound method
+                        }
+
+                        cell.addEventListener('click', () => this.handleGridClick(x, y));
+                        gridElement.appendChild(cell);
+                    }
+                }
+            }
+            
+            renderActionButtons(rover) {
+                const container = document.getElementById('action-buttons');
+                container.innerHTML = '';
+                
+                rover.modules.forEach(module => {
+                    const button = document.createElement('button');
+                    const isActive = this.activeModule === module.name;
+                    
+                    button.className = `w-full p-3 font-bold rounded-lg transition duration-150 shadow-md ${isActive ? 'bg-mars-orange text-black' : 'bg-gray-600 hover:bg-gray-500 text-mars-light'} disabled:opacity-50`;
+                    button.textContent = `${module.name} (${module.energyCost} E, +${module.heatGen} H)`;
+                    button.disabled = rover.energy < module.energyCost || this.gameState !== 'PLAYER_TURN';
+                    
+                    button.onclick = () => this.selectModule(module.name);
+                    container.appendChild(button);
+                });
+
+                document.getElementById('end-turn-btn').disabled = this.gameState !== 'PLAYER_TURN';
+            }
+            
+            // NEW: Logic to handle looting a crate
+            _lootCrate(rover, x, y) {
+                const lootableModules = GameConfig.LOOTABLE_MODULES;
+                
+                // If there are no lootable modules, just clear the tile
+                if (lootableModules.length === 0) {
+                     this.map.grid[y][x] = 'P'; 
+                     return;
+                }
+                
+                // Simple random selection
+                const ModuleClass = lootableModules[Math.floor(Math.random() * lootableModules.length)];
+                
+                rover.addModule(ModuleClass);
+                logMessage(`[${rover.name}] discovered and equipped the **${new ModuleClass().name}**!`, 'system');
+                
+                // Change the loot tile to Plain (P) after looting
+                this.map.grid[y][x] = 'P';
+            }
+
+            // --- Player Input Handling ---
+            
+            selectModule(moduleName) {
+                // Toggle selection
+                this.activeModule = this.activeModule === moduleName ? null : moduleName;
+                this.renderActionButtons(this.playerRover);
+                
+                if (!this.activeModule) {
+                    logMessage('Module deselected. Ready for movement.', 'system');
+                    this.renderGrid(); // Clear targeting highlight
+                    return;
+                }
+
+                const module = this.playerRover.findModule(moduleName);
+                if (module.type === 'Weapon') {
+                    // Clarified message to guide the user
+                    logMessage(`WEAPON ARMED: Click on an ENEMY ROVER within range (${module.range} tiles) to fire.`, 'damage');
+                } else if (module.type === 'Utility') {
+                    // Auto-use utility modules that target self (like Repair Bot)
+                    if (moduleName === 'Repair Bot') {
+                        const actionSuccess = this.executeAction(moduleName, this.playerRover);
+                        // FIX: Ensure module is deselected regardless of RepairBot success/failure to prevent stuck state
+                        this.activeModule = null; 
+                    }
+                }
+                this.renderGrid(); // Update grid to show potential targets
+            }
+
+            handleGridClick(x, y) {
+                if (this.gameState !== 'PLAYER_TURN') return;
+                const rover = this.playerRover;
+                
+                // 1. Check for movement
+                const cellId = `cell-${x}-${y}`;
+                const cell = document.getElementById(cellId);
+                let turnEnded = false; // Flag to track if an action ended the turn
+
+                if (cell.classList.contains('movable-cell') && !this.activeModule) {
+                    const terrainInfo = this.map.getTerrainInfo(x, y);
+                    
+                    if (!this.map.isCellOccupied(x, y, this.rovers.filter(r => r.name !== rover.name))) {
+                        
+                        if (rover.move(x, y, terrainInfo.cost)) {
+                            // Check for loot after successful move
+                            if (this.map.grid[y][x] === 'C') {
+                                this._lootCrate(rover, x, y);
+                            }
+                            
+                            this.renderUI();
+                            
+                            // Turn ends automatically after ONE successful move
+                            if (!this.isGameOver) {
+                                logMessage("Player completed a move. Player turn ends automatically.", 'system');
+                                this._nextTurn();
+                                turnEnded = true;
+                            }
+                        }
+                    } else {
+                         logMessage("That cell is blocked by another rover.", 'system');
+                    }
+                } 
+                
+                // 2. Check for action target
+                else if (this.activeModule && !turnEnded) {
+                    const targetRover = this.rovers.find(r => r.isAlive() && r.x === x && r.y === y && r.name !== rover.name);
+                    const module = rover.findModule(this.activeModule);
+                    let actionAttempted = false; 
+                    
+                    // --- Weapon Firing Logic ---
+                    if (module.type === 'Weapon') {
+                        actionAttempted = true;
+                        
+                        // Check 1: Valid Rover Target Found?
+                        if (!targetRover) {
+                            logMessage("ERROR: Weapon selected. Click on a target rover, not empty space.", 'damage');
+                        } 
+                        // Check 2: Friendly Fire?
+                        else if (targetRover.faction === rover.faction) {
+                            logMessage("ERROR: Cannot target self or allied rovers.", 'damage');
+                        }
+                        // Check 3: In Range?
+                        else if (getDistance(rover, targetRover) > module.range) {
+                            logMessage(`ERROR: Target ${targetRover.name} is OUT OF RANGE (${getDistance(rover, targetRover)} tiles away)!`, 'damage');
+                        } 
+                        // SUCCESS CONDITIONS MET: Attempt Execution
+                        else {
+                            const actionSuccess = this.executeAction(this.activeModule, targetRover);
+                            if (actionSuccess) {
+                                turnEnded = true;
+                            } else {
+                                // Action failed (must be energy/heat)
+                                logMessage(`WEAPON FAILED TO FIRE. Check Energy/Heat status.`, 'damage'); 
+                            }
+                        }
+                    }
+                    
+                    // FIX: If a weapon action was attempted, the selection must be cleared immediately.
+                    if (actionAttempted) {
+                         // The action is complete, successful or not. Clear selection.
+                         this.activeModule = null; 
+                    }
+                }
+                
+                // Only re-render UI if the turn did NOT end 
+                if (!turnEnded) {
+                    this.renderUI(); 
+                }
+            }
+            
+            executeAction(moduleName, target) {
+                const rover = this.playerRover;
+                const module = rover.findModule(moduleName);
+                
+                // This call handles the Energy check and logs failure if cost is too high
+                if (module.use(rover, target)) { 
+                    // Action successful
+                    this._checkGameState();
+                    this.clearHighlights(); // Clear highlights after action
+                    
+                    // NEW: Automatically end turn after successful module action
+                    if (!this.isGameOver) {
+                        this._nextTurn();
+                    }
+                    return true;
+                }
+                return false;
+            }
+
+            // --- Turn Flow and State Management ---
+
+            highlightPossibleMoves(rover) {
+                this.clearHighlights();
+
+                // Use Breadth-First Search (BFS) for movement based on remaining MP
+                const queue = [{ x: rover.x, y: rover.y, mp: rover.mp }];
+                const visited = new Set();
+                const possibleCoords = [];
+                visited.add(`${rover.x},${rover.y}`); // Start position
+
+                while (queue.length > 0) {
+                    const { x, y, mp } = queue.shift();
+                    
+                    // Check adjacent cells (North, East, South, West)
+                    const directions = [[0, 1], [0, -1], [1, 0], [-1, 0]];
+                    for (const [dx, dy] of directions) {
+                        const nx = x + dx;
+                        const ny = y + dy;
+                        const nextKey = `${nx},${ny}`;
+                        
+                        const terrain = this.map.getTerrainInfo(nx, ny);
+                        const cost = terrain.cost;
+
+                        // Check bounds, walls, cost, and if already visited with better/equal MP
+                        if (terrain.name !== 'Off Map' && cost !== 100 && mp >= cost) {
+                            
+                            // Check for rover collision (only final destination matters)
+                            if (this.map.isCellOccupied(nx, ny, this.rovers.filter(r => r.name !== rover.name))) {
+                                continue;
+                            }
+
+                            if (!visited.has(nextKey)) {
+                                visited.add(nextKey);
+                                queue.push({ x: nx, y: ny, mp: mp - cost });
+                                possibleCoords.push({ x: nx, y: ny });
+                            }
+                        }
+                    }
+                }
+                
+                this.possibleMoves = possibleCoords;
+                this.possibleMoves.forEach(coord => {
+                    const cell = document.getElementById(`cell-${coord.x}-${coord.y}`);
+                    if (cell) cell.classList.add('movable-cell');
+                });
+            }
+
+            clearHighlights() {
+                document.querySelectorAll('.movable-cell').forEach(cell => {
+                    cell.classList.remove('movable-cell');
+                });
+                // Remove weapon targeting highlight from enemy if present
+                document.querySelectorAll('.border-green-400').forEach(cell => {
+                    cell.classList.remove('border-green-400', 'border-4');
+                });
+                // Remove target glow from icons
+                document.querySelectorAll('.target-glow').forEach(icon => {
+                    icon.classList.remove('target-glow');
+                });
+
+                this.activeModule = null; // Also clear active module selection here
+                this.possibleMoves = [];
+            }
+
+            // --- AI Logic (Free-For-All) ---
+
+            _aiAction() {
+                const rover = this.getActiveRover(); // The current AI rover
+                
+                // 1. Find all potential targets (any living rover not self)
+                const potentialTargets = this.rovers.filter(r => r.isAlive() && r !== rover);
+                if (potentialTargets.length === 0) return; 
+
+                // 2. Find the closest target
+                let target = potentialTargets.reduce((closest, current) => {
+                    const distCurrent = getDistance(rover, current);
+                    const distClosest = closest ? getDistance(rover, closest) : Infinity;
+                    // Prefer player if distance is equal
+                    if (distCurrent === distClosest && current.faction === 'Player') return current; 
+                    return distCurrent < distClosest ? current : closest;
+                }, null);
+
+                if (!target) return;
+
+                // 3. AI Logic
+                // AI prioritizes the highest damage module it can use
+                let bestModule = null;
+                let maxDamage = 0;
+                
+                // Filter and sort modules by effectiveness (simple damage/energy ratio)
+                const availableModules = rover.modules
+                    .filter(m => m.energyCost <= rover.energy)
+                    .sort((a, b) => (b.damage / b.energyCost || 0) - (a.damage / a.energyCost || 0));
+
+                for (const module of availableModules) {
+                    if (module.type === 'Weapon' && getDistance(rover, target) <= module.range && module.damage > maxDamage) {
+                        bestModule = module;
+                        maxDamage = module.damage;
+                    }
+                }
+                
+                // A. Attack with the best weapon
+                if (bestModule) {
+                    bestModule.use(rover, target);
+                } 
+                // B. Check for repair if needed
+                else {
+                    const repair = rover.findModule('Repair Bot');
+                    // Simple repair rule: if HP is below 60% and no attack is possible
+                    if (repair && rover.hp < GameConfig.STARTING_HP * 0.6 && rover.energy >= repair.energyCost) {
+                        repair.use(rover, rover);
+                    } 
+                    // C. Otherwise, move closer or towards loot
+                    else if (rover.mp > 0) {
+                        
+                        // NEW ROBUST MOVEMENT LOGIC TO PREVENT STALEMATES:
+                        let validMoves = [];
+                        let currentDistance = getDistance(rover, target);
+
+                        const checks = [[0, 1], [0, -1], [1, 0], [-1, 0]];
+                        for (const [cdx, cdy] of checks) {
+                            const nx = rover.x + cdx;
+                            const ny = rover.y + cdy;
+                            const terrain = this.map.getTerrainInfo(nx, ny);
+                            const cost = terrain.cost;
+
+                            if (terrain.name !== 'Off Map' && cost !== 100 && rover.mp >= cost && !this.map.isCellOccupied(nx, ny, this.rovers)) {
+                                const newDistance = Math.abs(nx - target.x) + Math.abs(ny - target.y);
+                                validMoves.push({ nx, ny, cost, newDistance });
+                            }
+                        }
+
+                        let bestMove = null;
+
+                        if (validMoves.length > 0) {
+                            // 1. Find the moves that reduce the distance
+                            let forwardMoves = validMoves.filter(m => m.newDistance < currentDistance);
+                            
+                            // 2. Find the moves that maintain the distance (sideways movement)
+                            let lateralMoves = validMoves.filter(m => m.newDistance === currentDistance);
+                            
+                            let movePool = [];
+                            
+                            if (forwardMoves.length > 0) {
+                                // Prioritize the move that gets closest (minimum newDistance)
+                                const minNewDistance = Math.min(...forwardMoves.map(m => m.newDistance));
+                                movePool = forwardMoves.filter(m => m.newDistance === minNewDistance);
+                            } else if (lateralMoves.length > 0) {
+                                // If no forward move is possible, use lateral moves to reposition
+                                movePool = lateralMoves;
+                            }
+
+                            if (movePool.length > 0) {
+                                // Choose randomly from the best available pool (breaks stalemates)
+                                bestMove = movePool[Math.floor(Math.random() * movePool.length)];
+                            }
+                        }
+
+
+                        if (bestMove) {
+                            rover.move(bestMove.nx, bestMove.ny, bestMove.cost);
+                            // AI can still loot, but the automatic turn end will handle the progression
+                            if (this.map.grid[bestMove.ny][bestMove.nx] === 'C') {
+                                this._lootCrate(rover, bestMove.nx, bestMove.ny);
+                            }
+                        } else {
+                            // AI is surrounded or can only move away, so it stays put.
+                            logMessage(`[${rover.name}] is cornered and stays put.`, 'action');
+                        }
+                    } else {
+                        logMessage(`[${rover.name}] has no MP. Cooling down.`, 'action');
+                    }
+                }
+            }
+            
+            _nextTurn() {
+                if (this.isGameOver) return;
+                this.clearHighlights();
+                this.activeModule = null;
+                
+                let nextIndex = (this.currentTurnIndex + 1) % this.rovers.length;
+                let attempts = 0;
+                
+                // Cycle until an alive rover is found or we wrap around
+                while (!this.rovers[nextIndex].isAlive() && attempts < this.rovers.length) {
+                    nextIndex = (nextIndex + 1) % this.rovers.length;
+                    attempts++;
+                }
+
+                if (attempts === this.rovers.length) {
+                    // Safety check: if all rovers are dead, game should be over
+                    this._checkGameState();
+                    return;
+                }
+
+                this.currentTurnIndex = nextIndex;
+                
+                // Wait briefly before starting the next turn for visual clarity
+                setTimeout(() => this.handleTurn(), 500);
+            }
+
+            _checkGameState() {
+                const aliveRovers = this.rovers.filter(r => r.isAlive());
+                
+                if (aliveRovers.length <= 1) { // Check if 1 or 0 rovers remain
+                    this.isGameOver = true;
+                    const modal = document.getElementById('game-over-modal');
+                    const title = document.getElementById('modal-title');
+                    const message = document.getElementById('modal-message');
+
+                    if (aliveRovers.length === 1) {
+                        const winner = aliveRovers[0];
+                        title.textContent = winner.faction === 'Player' ? "VICTORY!" : "TO VALHALLA!";
+                        title.className = `text-5xl font-bold ${winner.faction === 'Player' ? 'text-green-400' : 'text-mars-red'} mb-4`;
+                        message.textContent = `${winner.name} is the last rover standing!`;
+                        logMessage(`*** GAME OVER: ${winner.name} WINS! ***`, 'system');
+                    } else {
+                        title.textContent = "DRAW";
+                        title.className = 'text-5xl font-bold text-gray-400 mb-4';
+                        message.textContent = "All rovers destroyed simultaneously. A dust-caked draw.";
+                        logMessage("*** GAME OVER: Draw. *** ", 'system');
+                    }
+                    modal.classList.remove('hidden');
+                    modal.classList.add('flex');
+                }
+            }
+            
+            // Bind public methods to UI elements
+            bindEvents() {
+                document.getElementById('end-turn-btn').addEventListener('click', () => {
+                    if (this.gameState === 'PLAYER_TURN') {
+                        logMessage("Player ended turn.", 'system');
+                        this._nextTurn();
+                    }
+                });
+            }
+        }
+
+        // Global initialization
+        let game;
+
+        // NEW: Function to start the main game loop
+        const beginCombat = () => {
+            // Hide the rules screen and show the game UI
+            document.getElementById('rules-screen').classList.add('hidden');
+            document.getElementById('game-ui').classList.remove('hidden');
+
+            // Initialize game engine and start the loop
+            game = new GameEngine();
+            game.bindEvents();
+            game.setupGame();
+        };
+
+        // NEW: Function to show the rules screen
+        const showRules = () => {
+            document.getElementById('start-screen').classList.add('hidden');
+            document.getElementById('rules-screen').classList.remove('hidden');
+        };
+
+        window.onload = () => {
+            // Bind the start button to show rules
+            document.getElementById('start-game-btn').addEventListener('click', showRules);
+            
+            // Bind the new combat button to start the game
+            document.getElementById('begin-combat-btn').addEventListener('click', beginCombat);
+        };
+    </script>
+</body>
+</html>
